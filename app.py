@@ -1,15 +1,28 @@
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
+import pandas as pd
+import solara
 
 from model import InformationModel, INFO_LEVELS, COGNITIVE_CAPACITY, SIGNAL_NOISE, TASK_COMPLEXITY
 from mesa.visualization import Slider, SolaraViz
-from mesa.visualization.components.matplotlib_components import make_mpl_space_component
+
+
+def _safe_dataframe(model):
+    """Build a DataFrame from model_vars, trimming all columns to the shortest
+    length to avoid the Mesa/pandas length-mismatch bug (off-by-one between
+    the initial collect() call and step-level collects)."""
+    raw = model.datacollector.model_vars
+    if not raw:
+        return pd.DataFrame()
+    min_len = min(len(v) for v in raw.values())
+    return pd.DataFrame({k: v[:min_len] for k, v in raw.items()})
+
 
 def draw_line_chart(model, ax):
     """Line chart: avg decision quality per info level over time."""
     ax.cla()
-    data = model.datacollector.get_model_vars_dataframe()
+    data = _safe_dataframe(model)
     if data.empty:
         return
     colors = cm.RdYlGn(np.linspace(0.15, 0.85, len(INFO_LEVELS)))
@@ -26,7 +39,7 @@ def draw_line_chart(model, ax):
 def draw_bar_chart(model, ax):
     """Bar chart: mean quality per info level across all steps so far."""
     ax.cla()
-    data = model.datacollector.get_model_vars_dataframe()
+    data = _safe_dataframe(model)
     if data.empty:
         return
     means  = [data[str(lvl)].mean() for lvl in INFO_LEVELS]
@@ -35,7 +48,7 @@ def draw_bar_chart(model, ax):
     cap_idx = min(range(len(INFO_LEVELS)), key=lambda i: abs(INFO_LEVELS[i] - model.cognitive_capacity))
     ax.axvline(cap_idx, color="black", linestyle="--", linewidth=1.2,
                label=f"Capacity ({model.cognitive_capacity})")
-    ax.set_title("Mean Quality by Info Load\n🟢 within capacity  🔴 overload")
+    ax.set_title("Mean Quality by Info Load\n[green] within capacity  [red] overload")
     ax.set_xlabel("Signals per step")
     ax.set_ylabel("Mean Decision Quality")
     ax.set_ylim(0, 1)
@@ -45,32 +58,6 @@ def draw_bar_chart(model, ax):
                 f"{val:.2f}", ha="center", fontsize=8)
 
 
-def make_combined_chart(draw_fn):
-    """Wrap a draw function into a Mesa matplotlib space component."""
-    def portrayal(model):
-        fig, ax = plt.subplots(figsize=(6, 3.5))
-        draw_fn(model, ax)
-        fig.tight_layout()
-        return fig
-
-    import solara
-
-    @solara.component
-    def Chart():
-        import solara
-        m = solara.use_state(None)
-
-        # Re-render on each reactive update by depending on the model
-        fig, ax = plt.subplots(figsize=(6, 3.5))
-        draw_fn(model_instance, ax)
-        fig.tight_layout()
-        solara.FigureMatplotlib(fig)
-        plt.close(fig)
-
-    return Chart
-
-import solara
-
 def LineChartComponent(model):
     fig, ax = plt.subplots(figsize=(6, 3.5))
     draw_line_chart(model, ax)
@@ -78,12 +65,14 @@ def LineChartComponent(model):
     solara.FigureMatplotlib(fig)
     plt.close(fig)
 
+
 def BarChartComponent(model):
     fig, ax = plt.subplots(figsize=(5, 3.5))
     draw_bar_chart(model, ax)
     fig.tight_layout()
     solara.FigureMatplotlib(fig)
     plt.close(fig)
+
 
 # Model parameters
 model_params = {
@@ -98,7 +87,6 @@ model_params = {
     ),
 }
 
-# Instantiate model
 model = InformationModel()
 
 page = SolaraViz(
