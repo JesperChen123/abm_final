@@ -23,7 +23,7 @@ abm_final/
 ├── batch/
 │   ├── batch_capacity.csv       # Results: varying cognitive capacity
 │   ├── batch_complexity.csv     # Results: varying task complexity
-│   ├── batch_grid.csv           # Results: full grid search (Batch 4)
+│   ├── batch_grid.csv           # Results: full grid search
 │   ├── batch_interaction.csv    # Results: noise × complexity interaction
 │   └── batch_noise.csv          # Results: varying signal noise
 ├── figure/                  # Output figures from batch analysis
