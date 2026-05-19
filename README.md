@@ -1,13 +1,14 @@
 # Does Information Abundance Help or Harm Decision-Making?
 
-An agent-based model exploring the relationship between information load and decision quality
+An agent-based model exploring when and why information environments fail decision-makers
+
 ---
 
 ## Overview
 
 It is tempting to assume that more information always leads to better decisions. This project challenges that assumption by simulating individual decision-makers with bounded cognitive capacity operating in environments of varying information abundance.
 
-The central finding is that decision quality follows an **inverted-U** over information load: performance improves up to a point, then declines as cognitive overload sets in. Crucially, this peak is not fixed — it tracks each agent's cognitive capacity. The model also identifies two additional failure modes: **signal noise** (unreliable information) and **task complexity** (irrelevant distractors).
+The central finding is that decision quality follows an **inverted-U** over information load: performance improves up to a point, then declines as cognitive overload sets in. Crucially, this peak is not fixed — it tracks each agent's cognitive capacity, so what counts as an optimal information environment depends entirely on who is in it. The model also identifies two additional and distinct failure modes: **signal noise** (unreliable information lowers the quality ceiling without shifting the peak) and **task complexity** (cognitively demanding decisions shift the peak rightward, leaving agents perpetually information-hungry rather than overloaded).
 
 ---
 
@@ -15,13 +16,17 @@ The central finding is that decision quality follows an **inverted-U** over info
 
 ```
 abm_final/
-├── agents.py               # DecisionAgent class and signal-processing logic
-├── model.py                # InformationModel class, scheduler, and data collection
-├── app.py                  # Solara GUI with interactive sliders and visualizations
-├── batch_analysis.ipynb    # Batch run experiments and figures
-├── batch_capacity.csv      # Results: varying cognitive capacity
-├── batch_noise.csv         # Results: varying signal noise
-├── batch_complexity.csv    # Results: varying task complexity
+├── agents.py                # DecisionAgent class and signal-processing logic
+├── model.py                 # InformationModel class, scheduler, and data collection
+├── app.py                   # Solara GUI with interactive sliders and visualizations
+├── batch_analysis.ipynb     # Batch run experiments and figures
+├── batch/
+│   ├── batch_capacity.csv       # Results: varying cognitive capacity
+│   ├── batch_complexity.csv     # Results: varying task complexity
+│   ├── batch_grid.csv           # Results: full grid search (Batch 4)
+│   ├── batch_interaction.csv    # Results: noise × complexity interaction
+│   └── batch_noise.csv          # Results: varying signal noise
+├── figure/                  # Output figures from batch analysis
 └── README.md
 ```
 
