@@ -1,63 +1,66 @@
 import mesa
 import numpy as np
 
+
 class DecisionAgent(mesa.Agent):
-    """
-    An agent making decisions under varying information loads.
-    Parameters
-    info_load - how many signals the agent receives each step
-    cognitive_capacity - how many signals the agent can process effectively
-    signal_noise - std-dev of noise added to each signal (0 = perfect signals)
-    task_complexity - how cognitively demanding the decision is (0-0.9)
-                    0 = simple daily choice (what to eat)
-                    0.9 = high-stakes complex decision (buying a house)
+    """Agent representing a single decision-maker processing information signals."""
 
-    Decision quality degrades when:
-      info_load > cognitive_capacity (overload)
-      signal_noise is high (corrupted information)
-      task_complexity is high (more evidence needed before quality judgment)
-    """
+    SMOOTHING    = 0.8  # memory weight: 80% prior, 20% new
+    NEIGHBOURHOOD = 5   # number of agents this agent can share load with
 
-    SMOOTHING = 0.8
-
-    def __init__(
-        self,
-        model,
-        info_load: int,
-        cognitive_capacity: int,
-        signal_noise: float = 0.0,
-        task_complexity: float = 0.0,
-    ):
+    def __init__(self, model, info_load: int, cognitive_capacity: int):
         super().__init__(model)
-        self.info_load          = info_load
-        self.cognitive_capacity = cognitive_capacity
-        self.signal_noise       = signal_noise
-        self.task_complexity    = task_complexity
-        self.decision_quality   = 0.5   # starts neutral [0, 1]
+        self.info_load          = info_load           # signals received per step (environmental)
+        self.cognitive_capacity = cognitive_capacity   # max signals agent can process (individual)
+        self.effective_load     = info_load           # adjusted after network sharing
+        self.decision_quality   = 0.5                 # neutral starting point
+
+    def _share_load(self):
+        """Overloaded agents offload excess signals to under-loaded neighbours.
+        Sharing is limited to a small random neighbourhood, not the whole population."""
+        my_overload = max(0, self.effective_load - self.cognitive_capacity)
+        if my_overload == 0:
+            return
+
+        # Sample a small local neighbourhood rather than searching all agents
+        all_others = [a for a in self.model.agents if a is not self]
+        neighbours = self.random.sample(all_others, min(self.NEIGHBOURHOOD, len(all_others)))
+        helpers    = [a for a in neighbours if a.effective_load < a.cognitive_capacity]
+
+        if not helpers:
+            return
+
+        helper   = self.random.choice(helpers)
+        spare    = helper.cognitive_capacity - helper.effective_load
+        transfer = min(my_overload, spare)
+
+        self.effective_load   -= transfer
+        helper.effective_load += transfer
 
     def _process_signals(self) -> float:
-        # cognitive capacity caps useful signals
-        useful   = min(self.info_load, self.cognitive_capacity)
-        overload = max(0, self.info_load - self.cognitive_capacity)
+        # Environmental conditions read from model, not stored on agent
+        signal_noise    = self.model.signal_noise
+        task_complexity = self.model.task_complexity
 
-        # task complexity raises the evidence threshold
-        # Complex task (complexity=0.9): agent needs around 2x more signals to reach
-        required_signals = self.cognitive_capacity * (1 + self.task_complexity)
+        useful   = min(self.effective_load, self.cognitive_capacity)
+        overload = max(0, self.effective_load - self.cognitive_capacity)
+
+        # Diminishing returns: complex tasks need more signals before quality improves
+        required_signals = self.cognitive_capacity * (1 + task_complexity)
         signal_benefit   = 1 - np.exp(-useful / required_signals)
 
-        # noise grows with overload (dual-process theory)
-        noise_scale  = useful / self.cognitive_capacity
-        overload_amp = 1 + overload / self.cognitive_capacity
-        noise_penalty = np.random.normal(
-            0, self.signal_noise * noise_scale * overload_amp
-        )
+        # Noise penalty scales with both signal_noise and overload (dual-process theory)
+        noise_scale   = useful / self.cognitive_capacity
+        overload_amp  = 1 + overload / self.cognitive_capacity
+        noise_penalty = np.random.normal(0, signal_noise * noise_scale * overload_amp)
 
-        # Structural overload degradation
+        # Structural degradation from exceeding capacity
         overload_noise = np.random.normal(0, overload * 0.08)
 
         return float(np.clip(signal_benefit + noise_penalty + overload_noise, 0, 1))
 
     def step(self):
+        self._share_load()        # network interaction before processing
         new_quality = self._process_signals()
         self.decision_quality = (
             self.SMOOTHING * self.decision_quality
